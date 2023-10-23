@@ -1,22 +1,16 @@
-/*A basic 4 channel transmitter using the nRF24L01 module.*/
-/* Like, share and subscribe, ELECTRONOOBS */
-/* http://www.youtube/c/electronoobs */
-
-/* First we include the libraries. Download it from
-   my webpage if you donw have the NRF24 library */
-
 #include <Arduino.h>
+#include <EncButton.h>
 #include <RF24.h>
 #include <SPI.h>
 #include <nRF24L01.h>
 
-/*Create a unique pipe out. The receiver has to
-  wear the same unique code*/
-
-const uint64_t pipeOut =
-    0xE8E8F0F0E1LL; // IMPORTANT: The same as in the receiver
-
-RF24 radio(9, 10); // select  CSN  pin
+// const uint64_t pipeOut = 0xE8E8F0F0E1LL;
+const uint64_t pipeOut = 0xF0F1F2F3F4LL;
+RF24 radio(9, 8);
+Button AUX1button(6);
+Button AUX2button(7);
+byte isAux1Clicked = 0;
+byte isAux2Clicked = 0;
 
 // The sizeof this struct should not exceed 32 bytes
 // This gives us up to 32 8 bits channals
@@ -27,15 +21,13 @@ struct MyData {
   byte roll;
   byte AUX1;
   byte AUX2;
+  byte BTN1;
+  byte BTN2;
 };
 
 MyData data;
 
 void resetData() {
-  // This are the start values of each channal
-  //  Throttle is 0 in order to stop the motors
-  // 127 is the middle value of the 10ADC.
-
   data.throttle = 0;
   data.yaw = 127;
   data.pitch = 127;
@@ -45,18 +37,15 @@ void resetData() {
 }
 
 void setup() {
-  // Start everything up
   radio.begin();
   radio.setAutoAck(false);
-  radio.setDataRate(RF24_250KBPS);
+  radio.setChannel(95);
+  radio.setDataRate(RF24_1MBPS);
+  radio.setPALevel(RF24_PA_HIGH);
   radio.openWritingPipe(pipeOut);
   resetData();
 }
 
-/**************************************************/
-
-// Returns a corrected value for a joystick position that takes into account
-// the values of the outer extents and the middle of the joystick range.
 int mapJoystickValues(int val, int lower, int middle, int upper, bool reverse) {
   val = constrain(val, lower, upper);
   if (val < middle)
@@ -66,15 +55,29 @@ int mapJoystickValues(int val, int lower, int middle, int upper, bool reverse) {
   return (reverse ? 255 - val : val);
 }
 
+void AuxButtonHandler() {
+  if (AUX1button.release()) {
+    isAux1Clicked = isAux1Clicked ? 0 : 1;
+  }
+  if (AUX2button.release()) {
+    isAux2Clicked = isAux2Clicked ? 0 : 1;
+  }
+}
+
 void loop() {
-  // The calibration numbers used here should be measured
-  // for your joysticks till they send the correct values.
-  data.throttle = mapJoystickValues(analogRead(A0), 13, 524, 1015, true);
-  data.yaw = mapJoystickValues(analogRead(A1), 1, 505, 1020, true);
-  data.pitch = mapJoystickValues(analogRead(A2), 12, 544, 1021, true);
-  data.roll = mapJoystickValues(analogRead(A3), 34, 522, 1020, true);
-  data.AUX1 = digitalRead(4); // The 2 toggle switches
-  data.AUX2 = digitalRead(5);
+
+  AUX1button.tick();
+  AUX2button.tick();
+  AuxButtonHandler();
+
+  data.throttle = mapJoystickValues(analogRead(A3), 0, 516, 1023, true);
+  data.yaw = mapJoystickValues(analogRead(A4), 0, 516, 1023, true);
+  data.pitch = mapJoystickValues(analogRead(A2), 0, 522, 1023, true);
+  data.roll = mapJoystickValues(analogRead(A1), 0, 506, 1023, true);
+  data.AUX1 = isAux1Clicked;
+  data.AUX2 = isAux2Clicked;
+  data.BTN1 = digitalRead(2);
+  data.BTN2 = digitalRead(3);
 
   radio.write(&data, sizeof(MyData));
 }
