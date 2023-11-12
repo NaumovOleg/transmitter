@@ -21,8 +21,6 @@ struct MyData {
   byte roll;
   byte AUX1;
   byte AUX2;
-  byte BTN1;
-  byte BTN2;
 };
 
 MyData data;
@@ -37,11 +35,13 @@ void resetData() {
 }
 
 void setup() {
+  Serial.begin(9600);
+  Serial.println("Start");
   radio.begin();
   radio.setAutoAck(false);
   radio.setChannel(95);
-  radio.setDataRate(RF24_1MBPS);
-  radio.setPALevel(RF24_PA_HIGH);
+  radio.setDataRate(RF24_250KBPS);
+  radio.setPALevel(RF24_PA_LOW);
   radio.openWritingPipe(pipeOut);
   resetData();
 }
@@ -76,8 +76,15 @@ void loop() {
   data.roll = mapJoystickValues(analogRead(A1), 0, 506, 1023, true);
   data.AUX1 = isAux1Clicked;
   data.AUX2 = isAux2Clicked;
-  data.BTN1 = digitalRead(2);
-  data.BTN2 = digitalRead(3);
+
+  Serial.print(data.throttle);
+  Serial.print("---");
+  Serial.print(data.yaw);
+  Serial.print("---");
+  Serial.print(data.pitch);
+  Serial.print("---");
+  Serial.print(data.roll);
+  Serial.println("----");
 
   radio.write(&data, sizeof(MyData));
 }
